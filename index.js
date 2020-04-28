@@ -34,7 +34,7 @@ function onConnection(ws, req) {
     ws.on('message', (data) => {
         const { type, message, user, directTo } = JSON.parse(data);
         if(!type) {
-            ws.send(JSON.stringify(new Message(type, new Date(), 'Server', 'Wrong message type. Accepted "text" and "image"')))
+            ws.send(JSON.stringify(new Message(type, new Date(), 'Server', 'Wrong message type. Accepted "text"')))
             return;
         }
         const msg = new Message(type, new Date(), user, message)
@@ -42,9 +42,9 @@ function onConnection(ws, req) {
             msgHistory.push(msg);
             broadcast(wss, msg)
         } else {
-            connectedClients[directTo] && connectedClients[directTo].send(
-                JSON.stringify(new Message('text', new Date(), user, message))
-            )
+            let msg = JSON.stringify(new Message('text', new Date(), user, message, directTo))
+            connectedClients[directTo] && connectedClients[directTo].send(msg)
+            ws.send(msg)
         }
     })
     const interval = setInterval(function ping() {
@@ -66,11 +66,12 @@ function onConnection(ws, req) {
 
 
 class Message {
-    constructor(type, time, user, message) {
+    constructor(type, time, user, message, directTo = null) {
         this.type = type,
         this.date = time
         this.user = user,
         this.message = message
+        this.directTo = directTo;
         this.uuid = uuid()
     }
 }
