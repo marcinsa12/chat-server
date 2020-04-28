@@ -17,50 +17,62 @@ wss.on('connection', onConnection);
 
 
 function onConnection(ws, req) {
-    const clientId = req.url.split('=')[1]
-    if(Object.keys(connectedClients).includes(clientId)) {
-        ws.send(JSON.stringify(new Message(
-            'error',
+  const clientId = req.url.split("=")[1]
+  if (Object.keys(connectedClients).includes(clientId)) {
+    preventClient(ws)
+  }
+  connectedClients[clientId] = ws
+  ws.isAlive = true
+  ws.on("pong", heartbeat)
+  ws.on("message", (data) => {
+    const { type, message, user, directTo } = JSON.parse(data)
+    if (!type) {
+      ws.send(
+        JSON.stringify(
+          new Message(
+            type,
             new Date(),
-            'Server',
-            'user-already-exist',
-        )))
-        ws.close()
-        return;
+            "Server",
+            'Wrong message type. Accepted "text"'
+          )
+        )
+      )
+      return
     }
-    connectedClients[clientId] = ws;
-    ws.isAlive = true;
-    ws.on('pong', heartbeat);
-    ws.on('message', (data) => {
-        const { type, message, user, directTo } = JSON.parse(data);
-        if(!type) {
-            ws.send(JSON.stringify(new Message(type, new Date(), 'Server', 'Wrong message type. Accepted "text"')))
-            return;
-        }
-        const msg = new Message(type, new Date(), user, message)
-        if(!directTo){
-            msgHistory.push(msg);
-            broadcast(wss, msg)
-        } else {
-            let msg = JSON.stringify(new Message('text', new Date(), user, message, directTo))
-            connectedClients[directTo] && connectedClients[directTo].send(msg)
-            ws.send(msg)
-        }
+    const msg = new Message(type, new Date(), user, message)
+    if (!directTo) {
+      msgHistory.push(msg)
+      broadcast(wss, msg)
+    } else {
+      let msg = JSON.stringify(
+        new Message("text", new Date(), user, message, directTo)
+      )
+      connectedClients[directTo] && connectedClients[directTo].send(msg)
+      ws.send(msg)
+    }
+  })
+  const interval = setInterval(function ping() {
+    wss.clients.forEach(function each(ws) {
+      if (ws.isAlive === false) return ws.terminate()
+
+      ws.isAlive = false
+      ws.ping(noop)
     })
-    const interval = setInterval(function ping() {
-        wss.clients.forEach(function each(ws) {
-            if (ws.isAlive === false) return ws.terminate();
-            
-            ws.isAlive = false;
-            ws.ping(noop);
-        });
-    }, 30000);
-    ws.on('close', ()=> {
-        clearInterval(interval);
-        delete connectedClients[clientId]
-        broadcast(wss, {"type": 'retrieve', "message": msgHistory, "clients": Object.keys(connectedClients)})
+  }, 30000)
+  ws.on("close", () => {
+    clearInterval(interval)
+    delete connectedClients[clientId]
+    broadcast(wss, {
+      type: "retrieve",
+      message: msgHistory,
+      clients: Object.keys(connectedClients),
     })
-    broadcast(wss, {"type": 'retrieve', "message": msgHistory, "clients": Object.keys(connectedClients)})
+  })
+  broadcast(wss, {
+    type: "retrieve",
+    message: msgHistory,
+    clients: Object.keys(connectedClients),
+  })
 }
 
 
@@ -87,4 +99,15 @@ function broadcast(wss, msg) {
             client.send(JSON.stringify(msg))
         }
     });
+}
+
+function preventClient(ws) {
+    ws.send(JSON.stringify(new Message(
+        'error',
+        new Date(),
+        'Server',
+        'user-already-exist',
+    )))
+    ws.close()
+    return;
 }
