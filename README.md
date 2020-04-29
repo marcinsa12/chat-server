@@ -5,6 +5,6 @@
 npm install
 ```
 
-### Compiles and run 
+### Run server 
 ```
 npm run dev
