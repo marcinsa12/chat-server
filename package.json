@@ -10,6 +10,6 @@
   "license": "ISC",
   "dependencies": {
     "uuidv4": "^6.0.7",
-    "ws": "^7.2.5"
+    "ws": "^7.4.6"
   }
 }
